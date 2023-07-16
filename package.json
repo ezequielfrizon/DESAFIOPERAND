@@ -8,10 +8,17 @@
   },
   "dependencies": {
     "@vue/eslint-config-standard": "^8.0.1",
+    "been": "^2.0.1",
     "core-js": "^3.8.3",
     "firebase": "^10.0.0",
+    "have": "^0.4.0",
+    "install": "^0.13.0",
+    "npm": "^9.8.0",
+    "should": "^13.2.3",
     "vue": "^2.6.14",
-    "vue-router": "^3.5.1",
+    "vue-route": "^1.5.1",
+    "vue-router": "^3.6.5",
+    "vue2-helpers": "^2.1.1",
     "vuetify": "^2.6.0",
     "vuex": "^3.6.2",
     "webfontloader": "^1.6.28"
