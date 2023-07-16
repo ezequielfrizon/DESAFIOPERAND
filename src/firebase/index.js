@@ -8,7 +8,7 @@ const firebaseConfig = {
   projectId: "desafio-operand",
   storageBucket: "desafio-operand.appspot.com",
   messagingSenderId: "412888438591",
-  appId: "1:412888438591:web:a4757a1e72b59c36cc658a"
+  appId: "1:412888438591:web:a4757a1e72b59c36cc658a",
 };
 
 const app = initializeApp(firebaseConfig);
