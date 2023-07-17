@@ -3,7 +3,7 @@
     <v-app>
       <v-content>
         <v-container>
-          <v-form ref="form" @submit.prevent="Register">
+          <v-form ref="form" @submit.prevent="register">
             <v-card class="mx-auto my-12 outer-card" max-width="374">
               <v-card-title>
                 <v-card
@@ -94,15 +94,18 @@
 </template>
 
 <script>
+import { doc, setDoc } from "firebase/firestore";
 import {
-  getAuth,
+  auth,
+  firestore,
   updateProfile,
   createUserWithEmailAndPassword,
-} from "firebase/auth";
+} from "@/firebase.js";
 
 export default {
   data() {
     return {
+      uid: "",
       name: "",
       email: "",
       show: false,
@@ -122,20 +125,27 @@ export default {
     };
   },
   methods: {
-    async Register() {
+    register() {
       if (this.$refs.form.validate()) {
-        try {
-          const auth = getAuth();
-          const { user } = await createUserWithEmailAndPassword(
-            auth,
-            this.email,
-            this.password
-          );
-          await updateProfile(user, { displayName: this.name });
-        } catch (error) {
-          console.error(error);
-          // Lida com erros, exibe uma mensagem de erro, etc.
-        }
+        createUserWithEmailAndPassword(auth, this.email, this.password)
+          .then(({ user }) => {
+            // Após criar o usuário autenticado, atualize o perfil para definir o displayName
+            return updateProfile(user, {
+              displayName: this.name,
+            }).then(() => {
+              // Após atualizar o perfil com o displayName, armazene os detalhes adicionais no Firestore
+              const userRef = doc(firestore, "users", user.uid);
+              const uid = (userRef._key.path.segments[1])
+              setDoc(userRef, {
+                uid: uid,
+                name: this.name,
+                email: this.email,
+              });
+            });
+          })
+          .catch((error) => {
+            console.error("Erro ao registrar:", error);
+          });
       }
     },
   },

@@ -47,7 +47,7 @@
               <v-icon dark> mdi-plus </v-icon>
             </v-btn>
           </template>
-          <v-form ref="form" @submit.prevent="save">
+          <v-form ref="form" @submit.prevent="saveUser">
             <v-card ref="form">
               <v-card-title>
                 <span class="text-h5">{{
@@ -81,7 +81,11 @@
                         filled
                       ></v-text-field>
                     </v-col>
-                    <v-col class="custom__col" cols="12">
+                    <v-col
+                      v-if="editedIndex === -1"
+                      class="custom__col"
+                      cols="12"
+                    >
                       <v-text-field
                         v-model="editedItem.password"
                         :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
@@ -132,7 +136,7 @@
       </v-toolbar>
     </template>
     <template v-slot:item.actions="{ item }">
-      <v-icon small color="#959595" class="mr-2" @click="editItem(item)">
+      <v-icon small color="#959595" class="mr-2" @click="editUser(item)">
         mdi-pencil
       </v-icon>
       <v-icon small color="#E96C6C" @click="deleteItem(item)">
@@ -141,6 +145,261 @@
     </template>
   </v-data-table>
 </template>
+
+<script>
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  doc,
+  addDoc,
+  setDoc,
+  getDoc,
+  deleteDoc,
+  getDocs as fetchDocs,
+} from "firebase/firestore";
+import {
+  auth,
+  firestore,
+  usersColRef,
+  updateProfile,
+  createUserWithEmailAndPassword,
+} from "@/firebase.js";
+
+export default {
+  setup() {
+    const Logout = () => {
+      auth
+        .signOut()
+        .then()
+        .catch((err) => alert(err.message));
+    };
+    return {
+      Logout,
+    };
+  },
+  name: "Home",
+  components: {},
+  data: () => ({
+    uid: "",
+    users: [],
+    show: false,
+    docRef: null,
+    userName: "",
+    userRef: null,
+    dialog: false,
+    dialogDelete: false,
+    rulesName: {
+      required: (value) => !!value || "Nome é obrigatório.",
+      min: (v) => v.length >= 6 || "Mínimo 6 caracteres",
+    },
+    rulesEmail: {
+      required: (value) => !!value || "Email é obrigatório.",
+      correct: (v) => /.+@.+\..+/.test(v) || "E-mail inválido",
+    },
+    rulesPassword: {
+      required: (value) => !!value || "Senha é obrigatória.",
+      min: (v) => v.length >= 8 || "Mínimo 8 caracteres",
+    },
+    headers: [
+      {
+        text: "Nome",
+        value: "name",
+        align: "start",
+      },
+      {
+        text: "Email",
+        value: "email",
+        sortable: false,
+      },
+      {
+        align: "end",
+        sortable: false,
+        text: "Actions",
+        value: "actions",
+      },
+    ],
+    userInfo: {
+      name: null,
+      email: null,
+    },
+    editedIndex: -1,
+    editedItem: {
+      id: "",
+      name: "",
+      email: "",
+    },
+    defaultItem: {
+      name: "",
+      email: "",
+    },
+    computed: {
+      form() {
+        return {
+          name: this.name,
+          email: this.email,
+        };
+      },
+    },
+    watch: {
+      dialog(val) {
+        val || this.close();
+      },
+      dialogDelete(val) {
+        val || this.closeDelete();
+      },
+    },
+
+    deleteItem(item) {
+      this.uid = item.uid;
+      this.dialogDelete = true;
+      this.editedItem = Object.assign({}, item);
+      this.editedIndex = this.users.indexOf(item);
+    },
+
+    close() {
+      this.dialog = false;
+      this.$nextTick(() => {
+        this.editedIndex = -1;
+        this.editedItem = Object.assign({}, this.defaultItem);
+      });
+    },
+
+    closeDelete() {
+      this.dialogDelete = false;
+      this.$nextTick(() => {
+        this.editedIndex = -1;
+        this.editedItem = Object.assign({}, this.defaultItem);
+      });
+    },
+  }),
+
+  methods: {
+    async fetchUsers() {
+      const querySnapshot = await fetchDocs(usersColRef);
+      this.users = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    },
+
+    async editUser(item) {
+      this.uid = item.uid;
+      const userDocRef = doc(firestore, "users", item.id);
+      this.userRef = userDocRef;
+      getDoc(userDocRef)
+        .then((docSnapshot) => {
+          if (docSnapshot.exists()) {
+            this.editedUser = {
+              id: docSnapshot.id,
+              ...docSnapshot.data(),
+            };
+          }
+        })
+        .catch((error) => {
+          console.error("Erro ao obter os dados do usuário:", error);
+        });
+      this.editedIndex = this.users.indexOf(item);
+      this.editedItem = Object.assign({}, item);
+      this.dialog = true;
+      const userRef = doc(usersColRef, item.id);
+      this.docRef = userRef;
+      const user = await getDoc(this.docRef);
+      const userData = user.data();
+      this.userInfo.name = userData.name;
+      this.userInfo.email = userData.email;
+    },
+
+    async deleteUser() {
+      const user = auth.currentUser;
+      if (user) {
+        user
+          .delete()
+          .then(() => {
+            // Exclusão do usuário bem-sucedida
+            // Exclua o documento do usuário do Firestore
+            const userDocRef = doc(firestore, "users", user.uid);
+            deleteDoc(userDocRef)
+              .then(() => {
+                // Exclusão do documento do usuário do Firestore bem-sucedida
+              })
+              .catch((error) => {
+                console.error(
+                  "Erro ao excluir o documento do usuário do Firestore:",
+                  error
+                );
+              });
+          })
+          .catch((error) => {
+            console.error("Erro ao excluir o usuário:", error);
+          });
+      }
+      this.fetchUsers();
+      this.closeDelete();
+    },
+
+    async saveUser() {
+      if (this.$refs.form.validate()) {
+        if (this.editedIndex > -1) {
+          try {
+            await setDoc(this.docRef, {
+              name: this.editedItem.name,
+              email: this.editedItem.email,
+            });
+
+            this.close();
+            this.fetchUsers();
+            this.closeDelete();
+          } catch (error) {
+            console.error("Erro ao atualizar o usuário:", error);
+          }
+        } else {
+          await addDoc(usersColRef, this.editedItem);
+          createUserWithEmailAndPassword(
+            auth,
+            this.editedItem.email,
+            this.editedItem.name,
+            this.editedItem.password
+          )
+            .then(({ user }) => {
+              // Após criar o usuário autenticado, atualize o perfil para definir o displayName
+              return updateProfile(user, {
+                displayName: this.editedItem.name,
+              }).then(() => {
+                // Após atualizar o perfil com o displayName, armazene os detalhes adicionais no Firestore
+                const userRef = doc(firestore, "users", user.uid);
+                const uid = userRef._key.path.segments[1];
+                setDoc(userRef, {
+                  uid: uid,
+                  name: this.editedItem.name,
+                  email: this.editedItem.email,
+                });
+              });
+            })
+            .catch((error) => {
+              console.error("Erro ao registrar:", error);
+            });
+          this.close();
+          this.fetchUsers();
+        }
+      }
+    },
+  },
+
+  mounted() {
+    this.fetchUsers();
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        this.userName = user.displayName;
+      } else {
+        return;
+      }
+    });
+  },
+
+  created() {
+    this.fetchUsers();
+  },
+};
+</script>
 
 <style>
 th {
@@ -214,191 +473,3 @@ th {
   padding: 0px !important;
 }
 </style>
-
-<script>
-import {
-  doc,
-  addDoc,
-  setDoc,
-  getDoc,
-  getDocs,
-  deleteDoc,
-} from "firebase/firestore";
-import usersColRef from "../firebase/index.js";
-import {
-  getAuth,
-  updateProfile,
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-} from "firebase/auth";
-
-export default {
-  setup() {
-    const auth = getAuth();
-
-    const Logout = () => {
-      auth
-        .signOut()
-        .then(() => console.log("saiu"))
-        .catch((err) => alert(err.message));
-    };
-
-    return {
-      Logout,
-    };
-  },
-  name: "Home",
-  components: {},
-  data: () => ({
-    users: [],
-    show: false,
-    docRef: null,
-    userName: "",
-    dialog: false,
-    dialogDelete: false,
-    rulesName: {
-      required: (value) => !!value || "Nome é obrigatório.",
-      min: (v) => v.length >= 6 || "Mínimo 6 caracteres",
-    },
-    rulesPassword: {
-      required: (value) => !!value || "Senha é obrigatória.",
-      min: (v) => v.length >= 8 || "Mínimo 8 caracteres",
-      emailMatch: () => "The email and password you entered don't match",
-    },
-    rulesEmail: {
-      required: (value) => !!value || "Email é obrigatório.",
-      correct: (v) => /.+@.+\..+/.test(v) || "E-mail inválido",
-    },
-    headers: [
-      {
-        text: "Nome",
-        value: "name",
-        align: "start",
-      },
-      {
-        text: "Email",
-        value: "email",
-        sortable: false,
-      },
-      {
-        align: "end",
-        sortable: false,
-        text: "Actions",
-        value: "actions",
-      },
-    ],
-    userInfo: {
-      name: null,
-      email: null,
-      password: null,
-    },
-    editedIndex: -1,
-    editedItem: {
-      name: "",
-      email: "",
-      password: "",
-    },
-    defaultItem: {
-      name: "",
-      email: "",
-      password: "",
-    },
-    computed: {
-      form() {
-        return {
-          name: this.name,
-          email: this.email,
-          password: this.password,
-        };
-      },
-    },
-    watch: {
-      dialog(val) {
-        val || this.close();
-      },
-      dialogDelete(val) {
-        val || this.closeDelete();
-      },
-    },
-
-    deleteItem(item) {
-      this.dialogDelete = true;
-      this.editedItem = Object.assign({}, item);
-      this.editedIndex = this.users.indexOf(item);
-    },
-
-    close() {
-      this.dialog = false;
-      this.$nextTick(() => {
-        this.editedIndex = -1;
-        this.editedItem = Object.assign({}, this.defaultItem);
-      });
-    },
-
-    closeDelete() {
-      this.dialogDelete = false;
-      this.$nextTick(() => {
-        this.editedIndex = -1;
-        this.editedItem = Object.assign({}, this.defaultItem);
-      });
-    },
-  }),
-
-  created() {
-    this.fetchUsers();
-  },
-
-  methods: {
-    async fetchUsers() {
-      let users = [];
-      let usersSnapShot = await getDocs(usersColRef);
-      usersSnapShot.forEach((user) => {
-        let userData = user.data();
-        userData.id = user.id;
-        users.push(userData);
-      });
-      this.users = users;
-    },
-    async editItem(item) {
-      this.editedIndex = this.users.indexOf(item);
-      this.editedItem = Object.assign({}, item);
-      this.dialog = true;
-      let userRef = doc(usersColRef, item.id);
-      this.docRef = userRef;
-      let user = await getDoc(this.docRef);
-      let userData = user.data();
-      this.userInfo.name = userData.name;
-      this.userInfo.email = userData.email;
-      this.userInfo.password = userData.password;
-    },
-    async deleteUser() {
-      let userRef = doc(usersColRef, this.editedItem.id);
-      await deleteDoc(userRef);
-      this.fetchUsers();
-      this.closeDelete();
-    },
-    async save() {
-      if (this.$refs.form.validate()) {
-        if (this.editedIndex > -1) {
-          await setDoc(this.docRef, this.editedItem);
-        } else {
-          addDoc(usersColRef, this.editedItem);
-        }
-        this.close();
-        this.fetchUsers();
-      }
-    },
-  },
-  //Pegar o nome do usuário logado no firebase
-  mounted() {
-    const auth = getAuth();
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        this.userName = user.displayName;
-      } else {
-        return;
-      }
-    });
-  },
-};
-</script>
