@@ -5,34 +5,18 @@
     :footer-props="{ 'items-per-page-text': 'Usuários por página' }"
     sort-by="name"
   >
+    <!-- Top section -->
     <template v-slot:top>
+      <!-- UserCard component -->
       <v-row class="custom__v-row-menu">
         <v-col class="custom__v-col-menu">
-          <v-card>
-            <v-card-title class="custom__card-title-menu">
-              <span class="text-h5">Usuário logado: {{ userName }}</span>
-              <v-spacer></v-spacer>
-              <v-menu bottom left>
-                <template v-slot:activator="{ on, attrs }">
-                  <v-btn dark icon v-bind="attrs" v-on="on">
-                    <v-icon>mdi mdi-menu</v-icon>
-                  </v-btn>
-                </template>
-                <v-list>
-                  <v-list-item>
-                    <v-btn dark normal text color="#694EDF" @click="Logout">
-                      Sair
-                    </v-btn>
-                  </v-list-item>
-                </v-list>
-              </v-menu>
-            </v-card-title>
-          </v-card>
+          <user-card :user-name="getUserName()"></user-card>
         </v-col>
       </v-row>
       <v-toolbar flat>
         <v-toolbar-title>CRUD de usuários</v-toolbar-title>
         <v-spacer></v-spacer>
+        <!-- UserForm component inside a v-dialog -->
         <v-dialog v-model="dialog" max-width="500px">
           <template v-slot:activator="{ on, attrs }">
             <v-btn
@@ -44,102 +28,59 @@
               v-bind="attrs"
               color="#694EDF"
             >
-              <v-icon dark> mdi-plus </v-icon>
+              <v-icon dark>mdi-plus</v-icon>
             </v-btn>
           </template>
-          <v-form ref="form" @submit.prevent="saveUser">
-            <v-card ref="form">
-              <v-card-title>
-                <span class="text-h5">{{
-                  editedIndex === -1 ? "Adicionar Usuário" : "Editar Usuário"
-                }}</span>
-              </v-card-title>
-              <v-divider></v-divider>
-              <v-card-text>
-                <v-container>
-                  <v-row justify="center">
-                    <v-col class="custom__col" cols="12">
-                      <v-text-field
-                        v-model="editedItem.name"
-                        ref="name"
-                        :rules="[rulesName.required, rulesName.min]"
-                        label="Nome"
-                        hint="Mínimo 6 caracteres"
-                        counter
-                        clearable
-                        filled
-                      ></v-text-field>
-                    </v-col>
-                    <v-col class="custom__col" cols="12">
-                      <v-text-field
-                        v-model="editedItem.email"
-                        :rules="[rulesEmail.required, rulesEmail.correct]"
-                        ref="email"
-                        label="Email"
-                        counter
-                        clearable
-                        filled
-                      ></v-text-field>
-                    </v-col>
-                    <v-col
-                      v-if="editedIndex === -1"
-                      class="custom__col"
-                      cols="12"
-                    >
-                      <v-text-field
-                        v-model="editedItem.password"
-                        :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
-                        :rules="[rulesPassword.required, rulesPassword.min]"
-                        :type="show ? 'text' : 'password'"
-                        ref="password"
-                        label="Senha"
-                        hint="Mínimo 8 caracteres"
-                        counter
-                        clearable
-                        filled
-                        @click:append="show = !show"
-                      ></v-text-field>
-                    </v-col>
-                  </v-row>
-                </v-container>
-              </v-card-text>
-              <v-card-actions>
-                <v-btn dark normal color="#595959" @click="close()">
-                  Cancelar
-                </v-btn>
-                <v-btn dark normal type="submit" color="#694EDF">
-                  Salvar
-                </v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-form>
+          <user-form
+            :edited-index="editedIndex"
+            :edited-item="editedItem"
+            :rules-name="rulesName"
+            :rules-email="rulesEmail"
+            :rules-password="rulesPassword"
+            :users="users"
+            :docRefValue="docRef ? docRef : {}"
+            @close="close"
+            @fetch-users="fetchUsers"
+            @close-delete="closeDelete"
+            @user-saved="fetchUsers"
+          ></user-form>
         </v-dialog>
+        <!-- Delete dialog -->
         <v-dialog v-model="dialogDelete" max-width="500px">
+          <!-- Delete user confirmation -->
           <v-card>
             <v-card-title>
-              <span class="text-h5"> Deletar Usuário </span>
+              <span class="text-h5">Deletar Usuário</span>
             </v-card-title>
             <v-divider></v-divider>
             <v-card-text class="custom__card-text">
               Tem certeza que deseja deletar o usuário {{ editedItem.name }}?
             </v-card-text>
             <v-card-actions>
-              <v-btn dark normal color="#595959" @click="closeDelete()"
-                >Cancelar</v-btn
-              >
-              <v-btn dark normal color="#694EDF" @click="deleteUser()"
-                >Excluir</v-btn
-              >
+              <v-btn dark normal color="#595959" @click="closeDelete()">
+                Cancelar
+              </v-btn>
+              <v-btn dark normal color="#694EDF" @click="deleteUser(uid)">
+                Excluir
+              </v-btn>
             </v-card-actions>
           </v-card>
         </v-dialog>
       </v-toolbar>
     </template>
+    <!-- Actions for each item in the table -->
     <template v-slot:item.actions="{ item }">
+      <!-- Edit icon -->
       <v-icon small color="#959595" class="mr-2" @click="editUser(item)">
         mdi-pencil
       </v-icon>
-      <v-icon small color="#E96C6C" @click="deleteItem(item)">
+      <!-- Delete icon -->
+      <v-icon
+        small
+        v-if="item.email !== loggedUserEmail"
+        color="#E96C6C"
+        @click="deleteItem(item)"
+      >
         mdi-delete
       </v-icon>
     </template>
@@ -150,258 +91,218 @@
 import { onAuthStateChanged } from "firebase/auth";
 import {
   doc,
-  addDoc,
-  setDoc,
   getDoc,
   deleteDoc,
   getDocs as fetchDocs,
 } from "firebase/firestore";
-import {
-  auth,
-  firestore,
-  usersColRef,
-  updateProfile,
-  createUserWithEmailAndPassword,
-} from "@/firebase.js";
+import { auth, firestore, usersColRef } from "@/firebase.js";
+import UserCard from "../components/UserCard.vue";
+import UserForm from "../components/UserForm.vue";
 
 export default {
-  setup() {
-    const Logout = () => {
-      auth
-        .signOut()
-        .then()
-        .catch((err) => alert(err.message));
-    };
+  name: "Home",
+  components: {
+    UserCard,
+    UserForm,
+  },
+  data() {
     return {
-      Logout,
+      uid: "",
+      users: [],
+      show: false,
+      docRef: null,
+      userName: "",
+      userRef: null,
+      dialog: false,
+      currentUser: null,
+      dialogDelete: false,
+      loggedUserEmail: "",
+      rulesName: {
+        required: (value) => !!value || "Nome é obrigatório.",
+        min: (v) => v.length >= 6 || "Mínimo 6 caracteres",
+      },
+      rulesEmail: {
+        required: (value) => !!value || "Email é obrigatório.",
+        correct: (v) => /.+@.+\..+/.test(v) || "E-mail inválido",
+      },
+      rulesPassword: {
+        required: (value) => !!value || "Senha é obrigatória.",
+        min: (v) =>
+          (typeof v === "string" && v.length >= 8) || "Mínimo 8 caracteres",
+      },
+      headers: [
+        {
+          text: "Nome",
+          value: "name",
+          align: "start",
+        },
+        {
+          text: "Email",
+          value: "email",
+          sortable: false,
+        },
+        {
+          align: "end",
+          sortable: false,
+          text: "Actions",
+          value: "actions",
+        },
+      ],
+      userInfo: {
+        name: null,
+        email: null,
+      },
+      editedIndex: -1,
+      editedItem: {
+        name: "",
+        email: "",
+        password: "",
+      },
+      defaultItem: {
+        name: "",
+        email: "",
+      },
     };
   },
-  name: "Home",
-  components: {},
-  data: () => ({
-    uid: "",
-    users: [],
-    show: false,
-    docRef: null,
-    userName: "",
-    userRef: null,
-    dialog: false,
-    dialogDelete: false,
-    rulesName: {
-      required: (value) => !!value || "Nome é obrigatório.",
-      min: (v) => v.length >= 6 || "Mínimo 6 caracteres",
+  computed: {
+    form() {
+      return {
+        name: this.name,
+        email: this.email,
+      };
     },
-    rulesEmail: {
-      required: (value) => !!value || "Email é obrigatório.",
-      correct: (v) => /.+@.+\..+/.test(v) || "E-mail inválido",
+  },
+  watch: {
+    dialog(val) {
+      if (!val) {
+        this.close();
+      }
     },
-    rulesPassword: {
-      required: (value) => !!value || "Senha é obrigatória.",
-      min: (v) => v.length >= 8 || "Mínimo 8 caracteres",
+    dialogDelete(val) {
+      if (!val) {
+        this.closeDelete();
+      }
     },
-    headers: [
-      {
-        text: "Nome",
-        value: "name",
-        align: "start",
-      },
-      {
-        text: "Email",
-        value: "email",
-        sortable: false,
-      },
-      {
-        align: "end",
-        sortable: false,
-        text: "Actions",
-        value: "actions",
-      },
-    ],
-    userInfo: {
-      name: null,
-      email: null,
-    },
-    editedIndex: -1,
-    editedItem: {
-      id: "",
-      name: "",
-      email: "",
-    },
-    defaultItem: {
-      name: "",
-      email: "",
-    },
-    computed: {
-      form() {
-        return {
-          name: this.name,
-          email: this.email,
-        };
-      },
-    },
-    watch: {
-      dialog(val) {
-        val || this.close();
-      },
-      dialogDelete(val) {
-        val || this.closeDelete();
-      },
-    },
-
-    deleteItem(item) {
-      this.uid = item.uid;
-      this.dialogDelete = true;
-      this.editedItem = Object.assign({}, item);
-      this.editedIndex = this.users.indexOf(item);
-    },
-
-    close() {
-      this.dialog = false;
-      this.$nextTick(() => {
-        this.editedIndex = -1;
-        this.editedItem = Object.assign({}, this.defaultItem);
-      });
-    },
-
-    closeDelete() {
-      this.dialogDelete = false;
-      this.$nextTick(() => {
-        this.editedIndex = -1;
-        this.editedItem = Object.assign({}, this.defaultItem);
-      });
-    },
-  }),
-
+  },
   methods: {
+    // Fetches the list of users from Firestore
     async fetchUsers() {
-      const querySnapshot = await fetchDocs(usersColRef);
-      this.users = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      try {
+        const querySnapshot = await fetchDocs(usersColRef);
+        const loggedUser = auth.currentUser;
+        if (loggedUser) {
+          this.loggedUserEmail = loggedUser.email;
+        }
+        this.users = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      } catch (error) {
+        console.error("Erro ao buscar usuários:", error);
+      }
     },
-
-    async editUser(item) {
+    // Retrieves the name of the currently logged-in user
+    getUserName() {
+      const user = auth.currentUser;
+      if (user) {
+        return user.displayName || ""; // Returns the name of the logged-in user or an empty string
+      } else {
+        return "";
+      }
+    },
+    // Edits a user
+    editUser(item) {
       this.uid = item.uid;
-      const userDocRef = doc(firestore, "users", item.id);
+      const userDocRef = doc(firestore, "users", this.uid);
       this.userRef = userDocRef;
       getDoc(userDocRef)
         .then((docSnapshot) => {
           if (docSnapshot.exists()) {
-            this.editedUser = {
+            this.editedItem = {
               id: docSnapshot.id,
               ...docSnapshot.data(),
             };
+            const userRef = doc(usersColRef, this.uid);
+            this.docRef = userDocRef;
           }
         })
         .catch((error) => {
           console.error("Erro ao obter os dados do usuário:", error);
         });
       this.editedIndex = this.users.indexOf(item);
-      this.editedItem = Object.assign({}, item);
+      this.editedItem = { ...item };
       this.dialog = true;
-      const userRef = doc(usersColRef, item.id);
-      this.docRef = userRef;
-      const user = await getDoc(this.docRef);
-      const userData = user.data();
-      this.userInfo.name = userData.name;
-      this.userInfo.email = userData.email;
     },
 
+    // Deletes a user
     async deleteUser() {
-      const user = auth.currentUser;
-      if (user) {
-        user
-          .delete()
-          .then(() => {
-            // Exclusão do usuário bem-sucedida
-            // Exclua o documento do usuário do Firestore
-            const userDocRef = doc(firestore, "users", user.uid);
-            deleteDoc(userDocRef)
-              .then(() => {
-                // Exclusão do documento do usuário do Firestore bem-sucedida
-              })
-              .catch((error) => {
-                console.error(
-                  "Erro ao excluir o documento do usuário do Firestore:",
-                  error
-                );
-              });
-          })
-          .catch((error) => {
-            console.error("Erro ao excluir o usuário:", error);
-          });
+      try {
+        const userDocRef = doc(firestore, "users", this.uid);
+        await deleteDoc(userDocRef);
+        console.log("Usuário excluído com sucesso do Firestore");
+        this.fetchUsers();
+      } catch (error) {
+        console.error("Erro ao excluir usuário do Firestore:", error);
       }
-      this.fetchUsers();
       this.closeDelete();
     },
 
-    async saveUser() {
-      if (this.$refs.form.validate()) {
-        if (this.editedIndex > -1) {
-          try {
-            await setDoc(this.docRef, {
-              name: this.editedItem.name,
-              email: this.editedItem.email,
-            });
+    // Closes the dialog
+    close() {
+      this.dialog = false;
+      this.$nextTick(() => {
+        this.editedIndex = -1;
+        this.editedItem = { ...this.defaultItem };
+      });
+    },
 
-            this.close();
-            this.fetchUsers();
-            this.closeDelete();
-          } catch (error) {
-            console.error("Erro ao atualizar o usuário:", error);
-          }
-        } else {
-          await addDoc(usersColRef, this.editedItem);
-          createUserWithEmailAndPassword(
-            auth,
-            this.editedItem.email,
-            this.editedItem.name,
-            this.editedItem.password
-          )
-            .then(({ user }) => {
-              // Após criar o usuário autenticado, atualize o perfil para definir o displayName
-              return updateProfile(user, {
-                displayName: this.editedItem.name,
-              }).then(() => {
-                // Após atualizar o perfil com o displayName, armazene os detalhes adicionais no Firestore
-                const userRef = doc(firestore, "users", user.uid);
-                const uid = userRef._key.path.segments[1];
-                setDoc(userRef, {
-                  uid: uid,
-                  name: this.editedItem.name,
-                  email: this.editedItem.email,
-                });
-              });
-            })
-            .catch((error) => {
-              console.error("Erro ao registrar:", error);
-            });
-          this.close();
-          this.fetchUsers();
-        }
+    // Closes the delete dialog
+    closeDelete() {
+      this.dialogDelete = false;
+      this.$nextTick(() => {
+        this.editedIndex = -1;
+        this.editedItem = { ...this.defaultItem };
+      });
+    },
+
+    // Logs out the user
+    logout() {
+      auth
+        .signOut()
+        .then(() => {})
+        .catch((err) => alert(err.message));
+    },
+
+    // Opens the delete dialog and sets the edited item
+    deleteItem(item) {
+      this.dialogDelete = true;
+      if (item && item.uid) {
+        this.uid = item.uid;
+        this.editedItem = { ...item };
+        this.editedIndex = this.users.findIndex(
+          (user) => user.uid === item.uid
+        );
+        this.$nextTick(() => {
+          this.dialogDelete = true;
+        });
       }
     },
   },
-
-  mounted() {
+  async mounted() {
     this.fetchUsers();
     onAuthStateChanged(auth, (user) => {
       if (user) {
         this.userName = user.displayName;
-      } else {
-        return;
       }
     });
   },
-
   created() {
     this.fetchUsers();
   },
 };
 </script>
 
-<style>
+<style scoped>
 th {
   font-size: 1rem !important;
   color: #676767 !important;
