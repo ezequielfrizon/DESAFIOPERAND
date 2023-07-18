@@ -7,15 +7,14 @@
     </template>
     <v-list>
       <v-list-item>
-        <v-btn dark normal text color="#694EDF" @click="logout">
-          Sair
-        </v-btn>
+        <v-btn dark normal text color="#694EDF" @click="logout"> Sair </v-btn>
       </v-list-item>
     </v-list>
   </v-menu>
 </template>
 
 <script>
+import { auth } from "@/firebase.js";
 import { signOut } from "firebase/auth";
 
 export default {

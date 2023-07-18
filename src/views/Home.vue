@@ -197,8 +197,11 @@ export default {
           id: doc.id,
           ...doc.data(),
         }));
-      } catch (error) {
-        console.error("Erro ao buscar usuários:", error);
+      } catch (err) {
+        this.$toasted.error("Erro ao cadastrar" + err.message, {
+          position: "top-right",
+          duration: 3000,
+        });
       }
     },
     // Retrieves the name of the currently logged-in user
@@ -226,8 +229,11 @@ export default {
             this.docRef = userDocRef;
           }
         })
-        .catch((error) => {
-          console.error("Erro ao obter os dados do usuário:", error);
+        .catch((err) => {
+          this.$toasted.error("Erro ao editar usuário" + err.message, {
+            position: "top-right",
+            duration: 3000,
+          });
         });
       this.editedIndex = this.users.indexOf(item);
       this.editedItem = { ...item };
@@ -239,10 +245,16 @@ export default {
       try {
         const userDocRef = doc(firestore, "users", this.uid);
         await deleteDoc(userDocRef);
-        console.log("Usuário excluído com sucesso do Firestore");
+        this.$toasted.success("Usuário excluído com sucesso", {
+          position: "top-right",
+          duration: 3000,
+        });
         this.fetchUsers();
-      } catch (error) {
-        console.error("Erro ao excluir usuário do Firestore:", error);
+      } catch (err) {
+        this.$toasted.error("Erro ao excluir usuário" + err.message, {
+          position: "top-right",
+          duration: 3000,
+        });
       }
       this.closeDelete();
     },
@@ -263,14 +275,6 @@ export default {
         this.editedIndex = -1;
         this.editedItem = { ...this.defaultItem };
       });
-    },
-
-    // Logs out the user
-    logout() {
-      auth
-        .signOut()
-        .then(() => {})
-        .catch((err) => alert(err.message));
     },
 
     // Opens the delete dialog and sets the edited item
