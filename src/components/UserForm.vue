@@ -60,7 +60,7 @@
 </template>
 
 <script>
-import { setDoc, getDoc, doc } from "firebase/firestore";
+import { setDoc, doc } from "firebase/firestore";
 import {
   auth,
   firestore,
@@ -123,8 +123,15 @@ export default {
             this.$emit("close");
             // Emite evento para informar que o usuário foi salvo
             this.$emit("user-saved", this.editedItem);
-          } catch (error) {
-            console.error("Erro ao atualizar o usuário:", error);
+            this.$toasted.success("Usuário editado com sucesso", {
+              position: "top-right",
+              duration: 3000,
+            });
+          } catch (err) {
+            this.$toasted.error("Erro ao editar usuário" + err.message, {
+              position: "top-right",
+              duration: 3000,
+            });
           }
         } else {
           const editedItem = this.editedItem;
@@ -148,13 +155,19 @@ export default {
               name: editedItem.name,
               email: editedItem.email,
             });
-            console.log("Usuário registrado com sucesso!");
             // Emite evento para fechar o formulário de edição
             this.$emit("close");
             // Emite evento para informar que o usuário foi salvo
             this.$emit("user-saved", this.editedItem);
-          } catch (error) {
-            console.error("Erro ao registrar:", error);
+            this.$toasted.success("Usuário criado com sucesso", {
+              position: "top-right",
+              duration: 3000,
+            });
+          } catch (err) {
+            this.$toasted.error("Erro ao cadastrar" + err.message, {
+              position: "top-right",
+              duration: 3000,
+            });
           }
         }
       }
@@ -168,7 +181,19 @@ export default {
 </script>
 
 <style scoped>
-/* Estilos específicos para o componente UserForm */
+.v-card__title {
+  color: #676767;
+  text-align: center;
+  justify-content: center;
+}
+.v-card__actions {
+  padding: 16px !important;
+  background-color: #f0f0f0;
+  justify-content: space-around;
+  .v-btn {
+    padding: 0 16px !important;
+  }
+}
 .text-h5 {
   word-break: normal;
 }

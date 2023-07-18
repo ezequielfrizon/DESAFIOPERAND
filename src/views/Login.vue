@@ -117,8 +117,10 @@ export default {
           const auth = getAuth();
           await signInWithEmailAndPassword(auth, this.email, this.password);
         } catch (error) {
-          console.error(error);
-          // Lida com erros, exibe uma mensagem de erro, etc.
+          this.$toasted.error("Ocorreu um erro", {
+            position: "top-right",
+            duration: 3000,
+          });
         }
       }
     },

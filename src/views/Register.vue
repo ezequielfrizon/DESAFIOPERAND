@@ -135,16 +135,23 @@ export default {
             }).then(() => {
               // Após atualizar o perfil com o displayName, armazene os detalhes adicionais no Firestore
               const userRef = doc(firestore, "users", user.uid);
-              const uid = (userRef._key.path.segments[1])
+              const uid = userRef._key.path.segments[1];
               setDoc(userRef, {
                 uid: uid,
                 name: this.name,
                 email: this.email,
               });
+              this.$toasted.success("Usuário criado com sucesso", {
+                position: "top-right",
+                duration: 3000,
+              });
             });
           })
-          .catch((error) => {
-            console.error("Erro ao registrar:", error);
+          .catch((err) => {
+            this.$toasted.error("Erro ao cadastrar" + err.message, {
+              position: "top-right",
+              duration: 3000,
+            });
           });
       }
     },
