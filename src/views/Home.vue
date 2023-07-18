@@ -300,9 +300,6 @@ export default {
       }
     });
   },
-  created() {
-    this.fetchUsers();
-  },
 };
 </script>
 
