@@ -16,7 +16,7 @@
                 ref="name"
                 :rules="[rulesName.required, rulesName.min]"
                 label="Nome"
-                hint="Mínimo 6 caracteres"
+                hint="Mínimo 3 caracteres"
                 counter
                 clearable
                 filled
