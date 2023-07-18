@@ -119,7 +119,7 @@ export default {
       loggedUserEmail: "",
       rulesName: {
         required: (value) => !!value || "Nome é obrigatório.",
-        min: (v) => v.length >= 6 || "Mínimo 6 caracteres",
+        min: (v) => v.length >= 3 || "Mínimo 3 caracteres",
       },
       rulesEmail: {
         required: (value) => !!value || "Email é obrigatório.",
